@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Пазл из фотографии — собери картинку</title>
+<title>TRACE // Puzzle — Restore Symbol</title>
 <style>
   :root{
     --bg:#0b1220; --panel:#0e172a; --ring:#1b2b4e; --ink:#e2e8f0; --muted:#94a3b8;
@@ -12,22 +12,44 @@
   html,body{height:100%}
   body{
     margin:0; background:radial-gradient(1200px 800px at 70% 10%, #111827 0%, var(--bg) 55%);
-    color:var(--ink); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial;
+    color:var(--ink); font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
     display:flex; align-items:center; justify-content:center; padding:24px;
   }
-  .wrap{width:min(1000px,96vw); background:linear-gradient(180deg,#0e172a 0%,#0b1220 100%);
-    border:1px solid #1f2a44; border-radius:20px; box-shadow:0 20px 60px #0008; padding:24px;}
-  header{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px}
+  .wrap{
+    width:min(1100px,96vw);
+    background:linear-gradient(180deg,#0e172a 0%,#0b1220 100%);
+    border:1px solid #1f2a44; border-radius:20px; box-shadow:0 20px 60px #0008;
+    padding:24px;
+  }
+  header{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:16px}
   header h1{font-size:18px; margin:0}
   header small{color:var(--muted)}
-  .stage{background:#0a1222; border:1px solid #16233e; border-radius:16px; position:relative; min-height:520px; display:flex; align-items:center; justify-content:center; overflow:hidden;}
-  .pill{background:#0b1430; border:1px solid var(--ring); border-radius:999px; padding:6px 10px; color:#cbd5e1; font-size:13px; display:inline-block}
-  .btn{appearance:none; border:1px solid var(--ring); background:#111b35; color:#dbeafe; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer}
-  .btn:disabled{opacity:.6; cursor:not-allowed}
+  .board{display:grid; grid-template-columns:1fr 260px; gap:24px; align-items:start}
+  @media (max-width:900px){.board{grid-template-columns:1fr}}
+  .stage{
+    background:#0a1222; border:1px solid #16233e; border-radius:16px;
+    position:relative; aspect-ratio:1/1; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .side{
+    background:#0a1222; border:1px solid #16233e; border-radius:16px;
+    padding:18px; height:100%;
+  }
+  .pill{
+    background:#0b1430; border:1px solid var(--ring);
+    border-radius:999px; padding:6px 10px; color:#cbd5e1;
+    font-size:13px; display:inline-block; margin-bottom:14px;
+  }
+  .btn{
+    appearance:none; border:1px solid var(--ring); background:#111b35;
+    color:#dbeafe; border-radius:10px; padding:10px 14px;
+    font-weight:600; cursor:pointer; width:100%; margin-bottom:10px;
+  }
   .btn.primary{background:#162a4a}
   .btn.success{background:#063f2b; color:#d1fae5; border-color:#134e4a}
+  .btn:disabled{opacity:.6; cursor:not-allowed}
   .puzzle{
-    position:relative; width:min(720px, 84vw); aspect-ratio:1/1;
+    position:relative; width:100%; height:100%;
     border-radius:14px; overflow:hidden; box-shadow:0 10px 40px #0007;
     user-select:none; touch-action:none;
   }
@@ -36,100 +58,97 @@
   .slot.highlight{outline-color:#334155}
   .piece{
     position:absolute; border-radius:6px; box-shadow:0 6px 18px #0009;
-    cursor:grab; touch-action:none; background-repeat:no-repeat; background-size:100% 100%;
-    transition:box-shadow .12s, transform .12s;
+    cursor:grab; touch-action:none; background-repeat:no-repeat;
+    background-size:100% 100%; transition:box-shadow .12s, transform .12s;
   }
   .piece:active{cursor:grabbing; box-shadow:0 6px 24px #000c; transform:translateZ(0) scale(1.02)}
   .ghost{position:absolute; inset:0; opacity:.08; background-size:cover; background-position:center; filter:grayscale(100%)}
   .doneOverlay{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(180deg,#0000,#0008); color:#fff; font-weight:700; font-size:28px;
+    background:linear-gradient(180deg,#0000,#0009); color:#fff; font-weight:700; font-size:28px;
     backdrop-filter: blur(4px); border-radius:14px;
   }
-  .controls{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; justify-content:center}
+  .final-message{
+    margin-top:20px; padding:16px;
+    border:1px solid var(--ring); border-radius:10px;
+    background:#0b1430; color:#a5f3fc;
+    font-family:"Courier New",monospace; white-space:pre-line;
+    opacity:0; transform:translateY(20px);
+    transition:all .6s ease;
+  }
+  .final-message.show{opacity:1; transform:none;}
 </style>
 </head>
 <body>
-  <div class="wrap" role="application" aria-label="Пазл из фотографии">
+  <div class="wrap" role="application" aria-label="TRACE Puzzle">
     <header>
-      <h1>Собери картинку</h1>
-      <small>Перетащи плитки, чтобы собрать фото</small>
+      <h1>TRACE // Puzzle</h1>
+      <small>Reconstruct the encrypted frame</small>
     </header>
 
-    <div class="stage">
-      <div id="puzzle" class="puzzle" aria-live="polite"></div>
-    </div>
+    <div class="board">
+      <div class="stage">
+        <div id="puzzle" class="puzzle"></div>
+      </div>
 
-    <div class="controls">
-      <span class="pill">Собрано: <b id="progress">0</b>%</span>
-      <button id="peek" class="btn" type="button">👀 Подсказка</button>
-      <button id="shuffle" class="btn primary">Перемешать</button>
-      <button id="reset" class="btn">Сбросить</button>
-      <button id="submit" class="btn success" disabled>Сдать</button>
+      <aside class="side">
+        <span class="pill">Собрано: <b id="progress">0</b>%</span>
+        <button id="shuffle" class="btn primary">Перемешать</button>
+        <button id="reset" class="btn">Сбросить</button>
+        <button id="submit" class="btn success" disabled>Сдать</button>
+        <div id="final" class="final-message"></div>
+      </aside>
     </div>
   </div>
 
 <script>
 /* ===== НАСТРОЙКА ===== */
-// Вставь сюда ссылку на своё фото (например с GitHub raw)
 const IMAGE_URL = "./puzzle.png";
 const GRID = {rows:5, cols:5};
 /* ===================== */
 
-const puzzle = document.getElementById('puzzle');
-const progressEl = document.getElementById('progress');
-const shuffleBtn = document.getElementById('shuffle');
-const resetBtn = document.getElementById('reset');
-const submitBtn = document.getElementById('submit');
-const peekBtn = document.getElementById('peek');
+const puzzle=document.getElementById('puzzle');
+const progressEl=document.getElementById('progress');
+const shuffleBtn=document.getElementById('shuffle');
+const resetBtn=document.getElementById('reset');
+const submitBtn=document.getElementById('submit');
+const finalBlock=document.getElementById('final');
+let slots=[],pieces=[],size={},done=false;
 
-let slots=[], pieces=[], size={}, ghostImg, done=false;
 function layoutContainer(){
-  const rect = puzzle.getBoundingClientRect();
-  size.w = rect.width; size.h = rect.height;
-  size.tw = size.w / GRID.cols;
-  size.th = size.h / GRID.rows;
+  const rect=puzzle.getBoundingClientRect();
+  size.w=rect.width; size.h=rect.height;
+  size.tw=size.w/GRID.cols; size.th=size.h/GRID.rows;
 }
 function build(){
   puzzle.innerHTML='';
   layoutContainer();
-  ghostImg=document.createElement('div');
-  ghostImg.className='ghost';
-  ghostImg.style.backgroundImage=`url("${IMAGE_URL}")`;
-  puzzle.appendChild(ghostImg);
-  const grid=document.createElement('div');
-  grid.className='grid';
-  puzzle.appendChild(grid);
+  const grid=document.createElement('div');grid.className='grid';puzzle.appendChild(grid);
   slots=[];
   for(let r=0;r<GRID.rows;r++){
     for(let c=0;c<GRID.cols;c++){
       const idx=r*GRID.cols+c;
       const s=document.createElement('div');
       s.className='slot';
-      s.style.left=(c*size.tw)+'px';
-      s.style.top=(r*size.th)+'px';
-      s.style.width=size.tw+'px';
-      s.style.height=size.th+'px';
-      s.dataset.index=idx;
-      grid.appendChild(s);
-      slots.push(s);
+      s.style.left=(c*size.tw)+'px'; s.style.top=(r*size.th)+'px';
+      s.style.width=size.tw+'px'; s.style.height=size.th+'px';
+      s.dataset.index=idx; grid.appendChild(s); slots.push(s);
     }
   }
-  pieces=[]; 
+  pieces=[];
   for(let idx=0;idx<GRID.rows*GRID.cols;idx++){
     const r=Math.floor(idx/GRID.cols), c=idx%GRID.cols;
     const p=document.createElement('div');
     p.className='piece';
-    p.style.width=size.tw+'px';
-    p.style.height=size.th+'px';
+    p.style.width=size.tw+'px'; p.style.height=size.th+'px';
     p.style.backgroundImage=`url("${IMAGE_URL}")`;
     p.style.backgroundSize=`${size.w}px ${size.h}px`;
     p.style.backgroundPosition=`${-c*size.tw}px ${-r*size.th}px`;
     p.dataset.correct=idx;
-    puzzle.appendChild(p);
-    pieces.push(p);
+    puzzle.appendChild(p); pieces.push(p);
   }
   scramble(); enableDrag(); updateProgress(); done=false; submitBtn.disabled=true;
+  finalBlock.classList.remove('show'); finalBlock.textContent='';
 }
 function scramble(){
   const pad=20;
@@ -140,31 +159,17 @@ function scramble(){
   });
 }
 function nearestSlot(piece){
-  const pc=center(piece);
-  let best=null,bestD=Infinity;
-  slots.forEach(s=>{
-    const sc=centerSlot(s);
-    const d=Math.hypot(pc.x-sc.x,pc.y-sc.y);
-    if(d<bestD){bestD=d;best=s;}
-  });
+  const pc=center(piece); let best=null,bestD=Infinity;
+  slots.forEach(s=>{const sc=centerSlot(s); const d=Math.hypot(pc.x-sc.x,pc.y-sc.y); if(d<bestD){bestD=d;best=s;}});
   return best;
 }
-function center(el){
-  const x=parseFloat(el.style.left)||0;
-  const y=parseFloat(el.style.top)||0;
-  return {x:x+el.offsetWidth/2,y:y+el.offsetHeight/2};
-}
-function centerSlot(s){
-  const x=parseFloat(s.style.left)||0;
-  const y=parseFloat(s.style.top)||0;
-  const w=parseFloat(s.style.width),h=parseFloat(s.style.height);
-  return {x:x+w/2,y:y+h/2};
-}
+function center(el){const x=parseFloat(el.style.left)||0;const y=parseFloat(el.style.top)||0;return{x:x+el.offsetWidth/2,y:y+el.offsetHeight/2};}
+function centerSlot(s){const x=parseFloat(s.style.left)||0;const y=parseFloat(s.style.top)||0;const w=parseFloat(s.style.width),h=parseFloat(s.style.height);return{x:x+w/2,y:y+h/2};}
 function dockPiece(piece,slot){
-  const targetIdx=Number(slot.dataset.index);
-  const other=pieces.find(p=>Number(p.dataset.slot)===targetIdx);
+  const idx=Number(slot.dataset.index);
+  const other=pieces.find(p=>Number(p.dataset.slot)===idx);
   const x=parseFloat(slot.style.left),y=parseFloat(slot.style.top);
-  piece.style.left=x+'px'; piece.style.top=y+'px'; piece.dataset.slot=targetIdx;
+  piece.style.left=x+'px';piece.style.top=y+'px';piece.dataset.slot=idx;
   if(other&&other!==piece){
     other.dataset.slot='';
     const pad=20;
@@ -181,7 +186,7 @@ function enableDrag(){
       p.style.zIndex=5;
       const move=ev=>{
         const dx=ev.clientX-startX,dy=ev.clientY-startY;
-        p.style.left=baseLeft+dx+'px'; p.style.top=baseTop+dy+'px';
+        p.style.left=baseLeft+dx+'px';p.style.top=baseTop+dy+'px';
         slots.forEach(s=>s.classList.remove('highlight'));
         nearestSlot(p).classList.add('highlight');
       };
@@ -215,17 +220,15 @@ function win(){
   puzzle.appendChild(ov); submitBtn.disabled=false;
   setTimeout(()=>ov.remove(),1000);
 }
-shuffleBtn.onclick=()=>{scramble();submitBtn.disabled=true;done=false;updateProgress();};
+shuffleBtn.onclick=()=>{scramble();submitBtn.disabled=true;done=false;updateProgress();finalBlock.classList.remove('show');};
 resetBtn.onclick=()=>build();
-submitBtn.onclick=()=>{submitBtn.textContent='Отправлено ✓';submitBtn.disabled=true;};
-peekBtn.onclick=()=>{
-  const on=ghostImg.style.opacity!=='0';
-  ghostImg.style.opacity=on?'0':'1';
-  peekBtn.textContent=on?'👀 Подсказка':'🙈 Скрыть';
+submitBtn.onclick=()=>{
+  submitBtn.textContent='Отправлено ✓';submitBtn.disabled=true;
+  finalBlock.textContent='Символ восстановлен: Р.\nTRACE RESTORED → AUDIO NODE\nCOMMENT: System attempts vocal output.';
+  finalBlock.classList.add('show');
 };
 window.onresize=()=>build();
 build();
 </script>
 </body>
 </html>
-
