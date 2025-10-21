@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Пазл из фотографии — перетяни и собери</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#0e172a; --ring:#1b2b4e; --ink:#e2e8f0; --muted:#94a3b8;
+    --primary:#60a5fa; --ok:#22c55e;
+  }
+  html,body{height:100%}
+  body{
+    margin:0; background:radial-gradient(1200px 800px at 70% 10%, #111827 0%, var(--bg) 55%);
+    color:var(--ink); font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .wrap{width:min(1100px,96vw); background:linear-gradient(180deg,#0e172a 0%,#0b1220 100%);
+    border:1px solid #1f2a44; border-radius:20px; box-shadow:0 20px 60px #0008; padding:24px;}
+  header{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px}
+  header h1{font-size:18px; margin:0}
+  header small{color:var(--muted)}
+  .board{display:grid; grid-template-columns:1fr 320px; gap:24px}
+  @media (max-width:980px){.board{grid-template-columns:1fr}}
+  .stage{background:#0a1222; border:1px solid #16233e; border-radius:16px; position:relative; min-height:520px; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .side{background:#0a1222; border:1px solid #16233e; border-radius:16px; padding:18px}
+  .pill{background:#0b1430; border:1px solid var(--ring); border-radius:999px; padding:6px 10px; color:#cbd5e1; font-size:13px; display:inline-block}
+  .btn{appearance:none; border:1px solid var(--ring); background:#111b35; color:#dbeafe; border-radius:10px; padding:10px 14px; font-weight:600; cursor:pointer}
+  .btn:disabled{opacity:.6; cursor:not-allowed}
+  .btn.primary{background:#162a4a}
+  .btn.success{background:#063f2b; color:#d1fae5; border-color:#134e4a}
+  /* Пазл */
+  .puzzle{
+    position:relative; width:min(720px, 84vw); aspect-ratio:1/1; /* квадрат для простоты; можно менять */
+    border-radius:14px; overflow:hidden; box-shadow:0 10px 40px #0007;
+    user-select:none; touch-action:none;
+  }
+  .grid{position:absolute; inset:0}
+  .slot{position:absolute; outline:1px dashed #1f2a44; border-radius:6px; transition:outline-color .2s}
+  .slot.highlight{outline-color:#334155}
+  .piece{
+    position:absolute; border-radius:6px; box-shadow:0 6px 18px #0009;
+    cursor:grab; touch-action:none; background-repeat:no-repeat; background-size:100% 100%;
+    transition:box-shadow .12s, transform .12s;
+  }
+  .piece:active{cursor:grabbing; box-shadow:0 6px 24px #000c; transform:translateZ(0) scale(1.02)}
+  .ghost{position:absolute; inset:0; opacity:.08; background-size:cover; background-position:center; filter:grayscale(100%)}
+  .doneOverlay{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#0000,#0008); color:#fff; font-weight:700; font-size:28px;
+    backdrop-filter: blur(4px); border-radius:14px;
+  }
+  .controls{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+  .meta{display:flex; gap:10px; align-items:center; justify-content:space-between}
+</style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Пазл из фотографии">
+    <header>
+      <h1>Пазл из фото — соберите картинку</h1>
+      <small>Перетащите плитки в клетки. Можно менять сложность (размер сетки).</small>
+    </header>
+
+    <div class="board">
+      <div class="stage">
+        <div id="puzzle" class="puzzle" aria-live="polite"></div>
+      </div>
+
+      <aside class="side">
+        <div class="meta">
+          <span class="pill">Собрано: <b id="progress">0</b>%</span>
+          <button id="peek" class="btn" type="button" title="Показать/скрыть подсказку">👀 Подсказка</button>
+        </div>
+
+        <p style="color:#94a3b8;margin-top:8px">
+          Вставляйте плитки в ближайшую свободную ячейку — если занята, плитки поменяются местами. Когда все встанут на свои места, вы увидите «Готово».
+        </p>
+
+        <div class="controls">
+          <button id="shuffle" class="btn primary">Перемешать</button>
+          <button id="reset" class="btn">Сбросить</button>
+          <button id="submit" class="btn success" disabled>Сдать</button>
+        </div>
+
+        <div style="margin-top:12px;color:#cbd5e1">
+          Сетка:
+          <button class="btn" data-grid="3x3">3×3</button>
+          <button class="btn" data-grid="4x4">4×4</button>
+          <button class="btn" data-grid="5x5">5×5</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+<script>
+/* === НАСТРОЙКИ ===
+ * 1) Замените ссылку ниже на вашу фотографию (GitHub Raw / CDN / локально рядом с HTML).
+ * 2) Измените GRID по умолчанию, если нужно.
+ */
+const IMAGE_URL = "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop"; // <-- ВАШЕ ФОТО
+let GRID = {rows:3, cols:3}; // 3×3 по умолчанию
+
+/* === ИНИЦИАЛИЗАЦИЯ === */
+const puzzle = document.getElementById('puzzle');
+const progressEl = document.getElementById('progress');
+const shuffleBtn = document.getElementById('shuffle');
+const resetBtn = document.getElementById('reset');
+const submitBtn = document.getElementById('submit');
+const peekBtn = document.getElementById('peek');
+const gridButtons = Array.from(document.querySelectorAll('[data-grid]'));
+
+let slots = [];       // DOM-элементы ячеек
+let pieces = [];      // DOM-элементы плиток
+let correctMap = [];  // индекс правильной клетки для каждой плитки
+let stateMap = [];    // текущая клетка для каждой плитки (или -1, если в воздухе)
+let size = {w:0, h:0, tw:0, th:0}; // размеры контейнера и тайла
+let ghostImg;         // подложка-подсказка
+let done = false;
+
+// Подгоняем фон-подсказку и контейнер
+function layoutContainer(){
+  const rect = puzzle.getBoundingClientRect();
+  size.w = rect.width; size.h = rect.height;
+  size.tw = size.w / GRID.cols;
+  size.th = size.h / GRID.rows;
+}
+
+// Создание сетки ячеек и плиток
+function build(){
+  puzzle.innerHTML = '';
+  layoutContainer();
+
+  // Подложка (образец)
+  ghostImg = document.createElement('div');
+  ghostImg.className = 'ghost';
+  ghostImg.style.backgroundImage = `url("${IMAGE_URL}")`;
+  ghostImg.style.backgroundSize = 'cover';
+  ghostImg.style.backgroundPosition = 'center';
+  ghostImg.style.opacity = '0';
+  puzzle.appendChild(ghostImg);
+
+  // Сетка ячеек
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  puzzle.appendChild(grid);
+  slots = [];
+  for(let r=0;r<GRID.rows;r++){
+    for(let c=0;c<GRID.cols;c++){
+      const idx = r*GRID.cols + c;
+      const s = document.createElement('div');
+      s.className = 'slot';
+      s.style.left = (c*size.tw)+'px';
+      s.style.top  = (r*size.th)+'px';
+      s.style.width = size.tw+'px';
+      s.style.height= size.th+'px';
+      s.dataset.index = idx;
+      grid.appendChild(s);
+      slots.push(s);
+    }
+  }
+
+  // Плитки
+  pieces = []; correctMap = []; stateMap = [];
+  const order = [...Array(GRID.rows*GRID.cols).keys()];
+  order.forEach(idx=>{
+    const r = Math.floor(idx / GRID.cols);
+    const c = idx % GRID.cols;
+
+    const p = document.createElement('div');
+    p.className = 'piece';
+    p.style.width = size.tw+'px';
+    p.style.height= size.th+'px';
+    p.style.backgroundImage = `url("${IMAGE_URL}")`;
+    // Важно: растягиваем фон на ВСЮ головную картинку в размерах контейнера,
+    // а затем сдвигаем позицию так, чтобы показывался нужный фрагмент.
+    p.style.backgroundSize = `${size.w}px ${size.h}px`;
+    p.style.backgroundPosition = `${-c*size.tw}px ${-r*size.th}px`;
+
+    p.dataset.correct = idx;  // правильная ячейка
+    pieces.push(p);
+    correctMap.push(idx);
+    stateMap.push(-1); // пока не в ячейке
+    puzzle.appendChild(p);
+  });
+
+  scramble(); // перемешать
+  enableDrag();
+  updateProgress();
+  done = false;
+  submitBtn.disabled = true;
+}
+
+// Перемешивание плиток (рандом в окрестности, не по сетке — для перетаскивания)
+function scramble(){
+  const pad = 20; // паддинг внутри контейнера, чтобы не прилипало к краям
+  pieces.forEach(p=>{
+    const x = pad + Math.random()*(size.w - size.tw - pad*2);
+    const y = pad + Math.random()*(size.h - size.th - pad*2);
+    placePieceXY(p, x, y);
+  });
+}
+
+// Установка позиции в абсолютных px
+function placePieceXY(p, x, y){
+  p.style.left = x+'px'; p.style.top = y+'px';
+}
+
+// Центр плитки
+function centerOf(el){
+  const x = parseFloat(el.style.left)||0;
+  const y = parseFloat(el.style.top)||0;
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  return {x:x+w/2, y:y+h/2};
+}
+
+// Центр слота
+function centerOfSlot(s){
+  const x = parseFloat(s.style.left)||0;
+  const y = parseFloat(s.style.top)||0;
+  const w = parseFloat(s.style.width);
+  const h = parseFloat(s.style.height);
+  return {x:x+w/2, y:y+h/2};
+}
+
+// Ближайшая ячейка
+function nearestSlot(piece){
+  const pc = centerOf(piece);
+  let best = null, bestD = Infinity;
+  for(const s of slots){
+    const sc = centerOfSlot(s);
+    const d = Math.hypot(pc.x - sc.x, pc.y - sc.y);
+    if(d < bestD){bestD = d; best = s;}
+  }
+  return best;
+}
+
+// Садим плитку в конкретный слот (с возможностью свапа)
+function dockPieceToSlot(piece, slot){
+  const targetIdx = Number(slot.dataset.index);
+
+  // есть ли плитка в этом слоте?
+  const other = pieces.find(p => Number(p.dataset.slot) === targetIdx);
+
+  // координаты центра слота → левый верх для плитки
+  const x = parseFloat(slot.style.left);
+  const y = parseFloat(slot.style.top);
+  placePieceXY(piece, x, y);
+  piece.dataset.slot = targetIdx;
+  stateMap[pieces.indexOf(piece)] = targetIdx;
+
+  if(other && other !== piece){
+    // переставляем "другую" плитку на прежнее место текущей
+    const prev = prevSlotOf(piece, other); // слот где стояла current до перемещения
+    if(prev !== null){
+      const prevSlot = slots[prev];
+      placePieceXY(other, parseFloat(prevSlot.style.left), parseFloat(prevSlot.style.top));
+      other.dataset.slot = prev;
+      stateMap[pieces.indexOf(other)] = prev;
+    }else{
+      // если current летал (не был в слоте) — отправим other в свободное рандомное место
+      other.dataset.slot = '';
+      stateMap[pieces.indexOf(other)] = -1;
+      const pad=20;
+      placePieceXY(other, pad + Math.random()*(size.w-size.tw-pad*2), pad + Math.random()*(size.h-size.th-pad*2));
+    }
+  }
+}
+
+function prevSlotOf(current, other){
+  // находим слот, где стоял current ДО того, как встал в новый
+  const idxCur = pieces.indexOf(current);
+  const idxOther = pieces.indexOf(other);
+  // ищем любой слот, совпадающий с прошлым state для current, но сейчас занятый other
+  // проще: вернуть старый state other
+  return stateMap[idxOther];
+}
+
+// d&d pointer events
+function enableDrag(){
+  pieces.forEach(p=>{
+    p.onpointerdown = (e)=>{
+      p.setPointerCapture(e.pointerId);
+      const startX = e.clientX, startY = e.clientY;
+      const baseLeft = parseFloat(p.style.left)||0;
+      const baseTop  = parseFloat(p.style.top)||0;
+      const prevSlotIndex = p.dataset.slot ? Number(p.dataset.slot) : null;
+
+      // визуал
+      p.style.zIndex = 5;
+
+      const move = (ev)=>{
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        placePieceXY(p, baseLeft+dx, baseTop+dy);
+
+        // подсветка ближайшей ячейки
+        slots.forEach(s=>s.classList.remove('highlight'));
+        const near = nearestSlot(p);
+        near.classList.add('highlight');
+      };
+      const up = ()=>{
+        p.releasePointerCapture(e.pointerId);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        slots.forEach(s=>s.classList.remove('highlight'));
+        p.style.zIndex = 1;
+
+        const near = nearestSlot(p);
+        dockPieceToSlot(p, near);
+
+        // если раньше стоял в слоте, сохраним старую позицию для свопа
+        if(prevSlotIndex!==null) { /* учтено в dockPieceToSlot */ }
+
+        checkProgress();
+      };
+
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    };
+  });
+}
+
+function updateProgress(){
+  const total = GRID.rows*GRID.cols;
+  let correct = 0;
+  pieces.forEach((p,i)=>{
+    if(Number(p.dataset.slot) === Number(p.dataset.correct)) correct++;
+  });
+  const pct = Math.round(correct/total*100);
+  progressEl.textContent = pct;
+  return pct;
+}
+
+function checkProgress(){
+  const pct = updateProgress();
+  if(pct === 100 && !done){
+    done = true;
+    win();
+  }
+}
+
+function win(){
+  // показываем прозрачную «готово»
+  const ov = document.createElement('div');
+  ov.className = 'doneOverlay';
+  ov.textContent = 'Готово!';
+  puzzle.appendChild(ov);
+  submitBtn.disabled = false;
+  setTimeout(()=>ov.remove(), 1000);
+}
+
+/* --- Кнопки --- */
+shuffleBtn.addEventListener('click', ()=>{
+  scramble();
+  pieces.forEach(p=>{ p.dataset.slot=''; });
+  stateMap = stateMap.map(()=>-1);
+  submitBtn.disabled = true; done = false;
+  updateProgress();
+});
+
+resetBtn.addEventListener('click', ()=>{
+  build();
+});
+
+submitBtn.addEventListener('click', ()=>{
+  submitBtn.textContent = 'Отправлено ✓';
+  submitBtn.disabled = true;
+});
+
+peekBtn.addEventListener('click', ()=>{
+  const on = ghostImg.style.opacity !== '0';
+  ghostImg.style.opacity = on ? '0' : '1';
+  peekBtn.textContent = on ? '👀 Подсказка' : '🙈 Скрыть подсказку';
+});
+
+// Смена сетки
+gridButtons.forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const [r,c] = b.dataset.grid.split('x').map(Number);
+    GRID = {rows:r, cols:c};
+    build();
+  });
+});
+
+/* --- Старт --- */
+window.addEventListener('resize', ()=>{
+  // при ресайзе пересобираем разметку, чтобы тайлы совпадали
+  build();
+});
+build();
+</script>
+</body>
+</html>
